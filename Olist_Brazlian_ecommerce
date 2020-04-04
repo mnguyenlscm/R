@@ -1,0 +1,712 @@
+---
+title: "Brazilian_Ecommerce"
+date: "March 20 2020"
+author: "NguyenLSCMFTU2"
+output: "html_document"
+---
+
+# Olist case
+
+**Please note: ** that This is just a quick look of me into datasets. Maybe, I will do more later.
+
+
+## Some first surprises when EDA datasets
+
+- As I know from previous notebooks and dataset descriptions. Olist is just a ecommerce solution, they just provide solutions for many sellers and buyers to gain the surplus.
+
+- I am from VietNam, which has many active and competitive marketplace platforms. From my vision in VietNam ecommerce. In basic, The market is divided into 2 main types:
+
+1. VietNam start-up companies that operate based on the funding by themselves
+( You can search **Tiki** and **Sendo** to know more their strategies and special operations)
+
+2. Foreign companies that operate based on the funding from their ``mother`` company
+( You can search **Shopee** and **Lazada** to know more their strategies and special operations)
+
+It  is probably not relevant to Olist, but I just want to provide you some other ways that how ecommerce are manipulated strategy to find a new way to survive.
+
+In last year, many ecommerce companies have given up and filed a bankrupcy because of hot competitive marketplace. ** Ecommerce is burning money **
+
+**Tiki** is a very special ecommerce in VietNam that has a 2h last mile delivery for Tikinow (Tiki has hired some people from Amazon and Facebook). Customers segment of Tiki is mainly located in City.
+To be honest, I wish I could work in Tiki environment because of their very special strategy and vision. 
+
+**Sendo** is known as VietNam start-up (like as Tiki). They focus on customers located in countryside and then widen to city
+
+In recently, There is some information that Tiki and Sendo are prepared to merge. 
+
+**Lazada ans Shopee**: Lazada is from giant Alibaba in China
+and Shopee is from giant SEA located in Singapore. They also burn many and many money to gain the marketshare.
+
+Top 1 of the number of suffering is Shopee
+Top 2 of the number of suffering is Lazada
+Top 3 of the number of suffering is Tiki
+Top 4 of the number of suffering is Sendo
+
+## Olist model
+
+
+Unlikely VietNam companies, Olist operates very differently. They just provide solution and platform for their customers (sellers and buyers). I am surprised that the leadtime for shipping product is mainly 12 days. Moreover there is some cases that are 42 days.
+
+               - There is no stock, warehouse
+               - There is no shipping product
+               - Don't buy products 
+               
+To know more Olist. I suggest that you should click on [Another_notebook](https://www.kaggle.com/anshumoudgil/olist-ecommerce-analytics-quasi-poisson-poly-regs/code). The author mention very well how Olist oprate it model. On the other hand, I learn from this notebook very much.
+
+
+
+<hr>
+
+# Preparation: Libraries and Datasets
+
+
+Here are some techniques that I use to standardize datasets for convenient purposes. Likewise, packages are used up to help me to intepret datasets.
+
+
+- *Leaflet* package is very powerful for visualizing aspect.
+- *zoo* package is loaded in order to convert date into **%B %Y** format.
+- *tidyverse* package is a very large combined parts. It also has a host website to publish guides
+- *scales* package is loaded in order to load `str_to_title() function` to convert string into right format 
+- *plotly* package is a package that help me to make interactive graph
+- *gridExtra* package is loaded to make many graphs into 1 frame graph
+- *crosstalk* package is used for interact with html format
+- *kableExtra* package is used for making stylish format
+- *DT* package  can't be valid in Kaggle platform. Otherwise, R studio IDE well load it.
+- *lubridate* package used to recognize and convert character into date format
+- *RColorBrewer* package used to take the beautiful Colors 
+- *patchwork* package is like as `gridExtra`, but it is very convenient for manipulating
+
+
+<hr> 
+
+## Load libraries
+
+```{r, warning=FALSE,message=FALSE,echo=FALSE }
+
+
+
+#Load libraries
+
+suppressMessages(library(tidyverse))
+suppressMessages(library(dplyr))
+suppressMessages(library(ggplot2))
+suppressMessages(library(scales))
+suppressMessages(library(plotly))
+suppressMessages(library(gridExtra))
+suppressMessages(library(crosstalk))
+suppressMessages(library(kableExtra))
+suppressMessages(library(DT))
+suppressMessages(library(leaflet))
+suppressMessages(library(lubridate))
+suppressMessages(library(RColorBrewer))
+suppressMessages(library(zoo))
+suppressMessages(library(patchwork))
+suppressMessages(library(ggsci))
+
+theme_set(theme_minimal())
+
+```
+
+
+## Load datasets
+
+```{r, warning=FALSE,message=FALSE,echo=FALSE }
+
+#Set working directory
+setwd("C:/Users/DellPC/Desktop/brazilian-ecommerce")
+customers <- read.csv("olist_customers_dataset.csv", header = TRUE)
+
+geolocation <-
+               read.csv("olist_geolocation_dataset.csv", header = TRUE)
+items <- read.csv("olist_order_items_dataset.csv", header = TRUE)
+payments <-
+               read.csv("olist_order_payments_dataset.csv", header = TRUE)
+reviews <-
+               read.csv("olist_order_reviews_dataset.csv", header = TRUE)
+orders <- read.csv("olist_orders_dataset.csv", header = TRUE)
+products <- read.csv("olist_products_dataset.csv", header = TRUE)
+sellers <- read.csv("olist_sellers_dataset.csv", header = TRUE)
+product_category_name <-
+               read.csv("product_category_name_translation.csv", header = TRUE)
+
+```
+
+## Standardize the datasets
+
+```{r, warning=FALSE,message=FALSE,echo=FALSE  }
+
+customers <-
+               customers %>% mutate(customer_city = str_to_title(customer_city))
+geolocation <-
+               geolocation %>% mutate(geolocation_city = str_to_title(geolocation_city))
+sellers <-
+               sellers %>% transmute(
+                              seller_city = str_to_title(seller_city),
+                              seller_id = seller_id,
+                              seller_zip_code_prefix = seller_zip_code_prefix,
+                              seller_state = seller_state
+               )
+
+items <-
+              items%>% mutate(shipping_limit_date=as.POSIXct(shipping_limit_date,format="%Y-%m-%d %H:%M:%S"))
+
+orders <-
+               orders %>% mutate(
+                              order_purchase_timestamp = as.POSIXct(
+                                             order_purchase_timestamp,
+                                             format = "%Y-%m-%d %H:%m:%s",
+                                             order_approved_at = as.POSIXct(order_approved_at, format = "%Y-%m-%d %H:%m:%s"),
+                                             order_delivered_carrier_date = as.POSIXct(
+                                                            order_delivered_carrier_date,
+                                                            format = "%Y-%m-%d %H:%m:%s",
+                                                            order_delivered_customer_date = as.POSIXct(order_estimated_delivery_date, format =
+                                                                                                                      "%Y-%m-%d %H:%m:%s"),
+                                                            order_estimated_delivery_date = as.POSIXct(order_estimated_delivery_date, format =
+                                                                                                                      "%Y-%m-%d %H:%m:%s")
+                                             )
+                              )
+               )
+payments <-
+               payments %>% mutate(
+                              payment_type = fct_recode(
+                                             payment_type,
+                                             "Credit card" = "credit_card",
+                                             "Boleto" = "boleto",
+                                             "Debit card" = "debit_card",
+                                             "Not defined" = "not_defined",
+                                             "Voucher" = "voucher"
+                              )
+               )
+product_category_name <-
+               product_category_name %>% transmute(
+                              product_category_name = ï..product_category_name,
+                              product_category_name_english = product_category_name_english
+               ) %>% mutate(product_category_name_english = str_to_title(product_category_name_english),product_category_name=str_to_title(product_category_name))
+products <-
+               products %>% transmute(product_id=product_id,
+                              product_category_name = str_to_title(product_category_name),
+                              weight = product_weight_g,
+                              quantity = product_photos_qty,
+                              weight = product_weight_g,
+                              height = product_height_cm,
+                              width = product_width_cm
+               )
+reviews <-
+               reviews %>% transmute(
+                              score = review_score,
+                              comment = review_comment_message,
+                              creation_date = review_creation_date,
+                              answer = review_answer_timestamp
+               ) %>% mutate(creation_date = as.POSIXct(creation_date, format = "%Y-%m-%d %H:%M:%s"))
+
+```
+
+<hr>
+
+# It's time to have a first look at Olist datasets {.tabset .tabset-fade .tabset-pills}
+
+- Here are somethings that I have a first look at Olist datasets
+
+## Customer
+
+I don't know why they just store in prefix-zip-code in datasets. Because This is not enough elements to determine each geolocation for each customers. To visualize geolocation, I just calculate the mean of longitude and latitude to have a general view.
+
+               - customer_id
+               - customer_unique_id
+               - customer_zip_code_prefix
+               - customer_city
+               - customer_state
+               
+```{r, message=FALSE, warning=FALSE, echo=FALSE }
+
+customers%>%head(10)%>%kable()%>%kable_styling()
+
+```
+
+
+## Geolocation
+
+There are some typo in processing text, but it's more popular in less frequent geolocation_city
+
+               - geolocation_zip_code_prefix
+               - geolocation_lat
+               - geolocation_lng
+               - geolocation_city
+               - geolocation_state
+               
+               
+```{r, message=FALSE, warning=FALSE, echo=FALSE,echo=FALSE }
+
+geolocation%>%head(10)%>%kable()%>%kable_styling()
+
+```
+
+## Order
+
+There are some typo in processing text, but it's more popular in less frequent geolocation_city
+
+               - order_id
+               - customer_id
+               - order_status
+               - order_purchase_timestamp
+               - order_approved_at
+               - order_delivered_carrier_date
+               - order_delivered_customer_date
+               - order_estimated_delivery_date
+               
+               
+```{r, message=FALSE, warning=FALSE, echo=FALSE }
+
+orders%>%head(10)%>%kable()%>%kable_styling()
+
+```
+
+
+## Item
+
+I don't understand Is order_item_id like as order quantity?
+
+
+               - order_id
+               - order_item_id
+               - product_id
+               - seller_id
+               - shipping_limit_date
+               - price
+               - freight_value
+               
+               
+```{r, message=FALSE, warning=FALSE, echo=FALSE }
+
+items%>%head(10)%>%kable()%>%kable_styling()
+
+```
+
+
+## Payment
+
+I don't understand `payment_sequential like as payment quantity?`
+
+
+               - order_id
+               - payment_sequential
+               - payment_type
+               - payment_installments
+               - payment_value
+               
+               
+```{r, message=FALSE, warning=FALSE, echo=FALSE }
+
+payments%>%head(10)%>%kable()%>%kable_styling()
+
+```
+
+
+## Review
+
+I don't know Portugese, so the review comment is quite difficult for me to understand. But my first think approach is use sentiment
+
+
+               - review_id
+               - order_id
+               - review_score
+               - review_comment_title
+               - review_comment_message
+               - review_creation_date
+               - review_answer_timestamp
+               
+               
+```{r, message=FALSE, warning=FALSE, echo=FALSE }
+
+reviews%>%head(10)%>%kable()%>%kable_styling()
+
+```
+
+
+## Seller
+
+               - seller_city
+               - seller_id
+               - seller_zip_code_prefix
+               - seller_state
+               
+               
+```{r, message=FALSE, warning=FALSE, echo=FALSE }
+
+sellers%>%head(10)%>%kable()%>%kable_styling()
+
+```
+
+## Product
+
+               - product_category_name
+               - weight
+               - quantity
+               - height
+               - widths
+               
+```{r, message=FALSE, warning=FALSE, echo=FALSE }
+
+products%>%head(10)%>%kable()%>%kable_styling()
+
+```
+
+## Product_Category_Name
+
+
+               - product_category_name
+               - product_category_name_english
+               
+```{r, message=FALSE, warning=FALSE, echo=FALSE }
+
+
+product_category_name%>%head(10)%>%kable()%>%kable_styling()
+
+```
+
+<hr>
+
+
+# Customers and Seller  dive deeply{.tabset .tabset-fade .tabset-pills}
+
+- These contents are below approaches:
+(You can also interact with these plots and zoom more into)
+
+1. Statistical column in city scope
+2. Statistical column in state scope
+3. Geographical map in city scope
+4. Geographical map in state scope
+5. Geographical payment type 
+6. The number of increasing userids and sellers
+
+## Customers Perspective
+
+```{r, warning=FALSE, message=FALSE,fig.align="left",fig.width=8,fig.height=8,echo=FALSE }
+
+
+#Statistics in column for city and state
+gg <-
+               customers %>% group_by(customer_state) %>% count() %>% arrange(desc(n)) %>%
+               ggplot(aes(
+                              x = fct_reorder(customer_state, n),
+                              y = n,
+                              label = n,
+                              fill = customer_state
+               )) + geom_col() + theme(axis.text.x = element_text(angle = 90, vjust = 1)) +
+               coord_flip() + labs(title = "Number of customers in each state") + xlab("Brazilian State") +
+               ylab("Number of customers ") + scale_y_continuous(labels = comma)
+ggplotly(gg)
+
+
+gg <-
+               customers %>% transmute(a = fct_lump(customer_city, 30)) %>% group_by(a) %>%
+               count() %>% ggplot(aes(
+                              x = fct_reorder(a, n),
+                              y = n,
+                              label = n,
+                              fill = a
+               )) + geom_col() + theme(axis.text.x = element_text(angle = 90, vjust = 1), legend.title = element_blank()) +
+               coord_flip() + labs(title = "Number of customers in each most city") + xlab("Brazilian city") +
+               ylab("Number of customers ") + scale_y_continuous(labels = comma)
+ggplotly(gg)
+
+
+
+#Draw the geographical map for city and state
+
+"Cities"
+
+##Prepare data set
+j_cus <-
+               customers %>% select_at(vars(customer_city, customer_zip_code_prefix, customer_state)) %>% group_by(customer_city) %>%
+               count() %>% filter(n > 100)
+
+"Cities that have equal and more than 100 customers"
+j_geo <-
+               geolocation %>% select_at(
+                              vars(
+                                             geolocation_zip_code_prefix,
+                                             geolocation_lat,
+                                             geolocation_lng,
+                                             geolocation_state,
+                                             geolocation_city
+                              )
+               ) %>% unique.data.frame() %>% group_by(geolocation_city) %>% summarise(
+                              geolocation_lng = mean(geolocation_lng),
+                              geolocatio_lat = mean(geolocation_lat)
+               )
+
+"This dataset have some duplicated rows, the long and lat of different cities are the same"
+j_cus_geo <-
+               inner_join(j_cus, j_geo, by = c("customer_city" = "geolocation_city")) %>%
+               mutate(popup = paste(customer_city, "-", n))
+
+##Draw the map (customer_city)
+
+               j_cus_geo %>% leaflet() %>% addTiles() %>% addProviderTiles(provider = providers$Esri.WorldTopoMap) %>%
+               addProviderTiles(provider = providers$HERE.mapLabels) %>% addProviderTiles(providers$Stamen.TonerLines) %>%
+               addCircleMarkers(
+                              lng =  ~ geolocation_lng,
+                              lat =  ~ geolocatio_lat,
+                              popup = ~ popup,
+                              radius = ~ sqrt(n) / 5,
+                              label =  ~ customer_city,
+                              color = "black",
+                              fill = "white"
+               ) %>% addPopups(
+                              lng = ~ geolocation_lng,
+                              lat =  ~ geolocatio_lat,
+                              popup = ~ popup,
+                              options = popupOptions(closeOnClick = FALSE)
+               )
+
+"States"
+##Prepare data set
+j_cus <-
+               customers %>% select_at(vars(customer_city, customer_zip_code_prefix, customer_state)) %>% group_by(customer_state) %>%
+               count()
+
+"There are 27 states in Brazil"
+
+j_geo <-
+               geolocation %>% select_at(
+                              vars(
+                                             geolocation_zip_code_prefix,
+                                             geolocation_lat,
+                                             geolocation_lng,
+                                             geolocation_state,
+                                             geolocation_city
+                              )
+               ) %>% unique.data.frame() %>% group_by(geolocation_state) %>% summarise(
+                              geolocation_lng = mean(geolocation_lng),
+                              geolocatio_lat = mean(geolocation_lat)
+               )
+
+"This dataset have some duplicated rows, the long and lat of different cities are the same"
+
+j_cus_geo <-
+               inner_join(j_cus, j_geo, by = c("customer_state" = "geolocation_state")) %>%
+               mutate(popup = paste(customer_state, "-", n))
+
+##Draw the map (state_map)
+
+               j_cus_geo %>% leaflet() %>% addTiles() %>% addTiles() %>% addProviderTiles(provider = providers$Esri.WorldTopoMap) %>%
+               addProviderTiles(provider = providers$HERE.mapLabels) %>% addProviderTiles(providers$Stamen.TonerLines) %>%
+               addCircleMarkers(
+                              lng =  ~ geolocation_lng,
+                              lat =  ~ geolocatio_lat,
+                              popup = ~ popup,
+                              radius = ~ sqrt(n) / 5,
+                              label =  ~ customer_state,
+                              color = "black",
+                              fill = "white"
+               ) %>% addPopups(
+                              lng = ~ geolocation_lng,
+                              lat =  ~ geolocatio_lat,
+                              popup = ~ popup,
+                              options = popupOptions(closeOnClick = FALSE)
+               )
+
+#Payments in each city and state
+j_p_o <- left_join(payments, orders, by = "order_id")
+j_p_o <-
+               j_p_o %>% select(order_id, payment_type, payment_value, order_status)
+
+j_o_c <- left_join(orders, customers, by = c("customer_id"))
+j_o_c <- j_o_c %>% select(order_id, customer_zip_code_prefix)
+
+j_o_g <-
+               left_join(
+                              customers,
+                              geolocation,
+                              by = c("customer_zip_code_prefix" = "geolocation_zip_code_prefix")
+               )
+j_o_g <-
+               j_o_g %>% select(
+                              customer_zip_code_prefix,
+                              geolocation_city,
+                              geolocation_state,
+                              geolocation_lat,
+                              geolocation_lng
+               ) %>% group_by(customer_zip_code_prefix,
+                              geolocation_city,
+                              geolocation_state) %>% summarise(
+                                             geolocation_lng = mean(geolocation_lng),
+                                             geolocation_lat = mean(geolocation_lat)
+                              )
+
+j1 <-
+               left_join(j_p_o, j_o_c, by = "order_id") %>% group_by(customer_zip_code_prefix, payment_type) %>%
+               summarise(payment_value = mean(payment_value))
+j2 <-
+               left_join(j1, j_o_g, by = "customer_zip_code_prefix") %>% group_by(payment_type, geolocation_state) %>%
+               summarise(
+                              geolocation_lng = mean(geolocation_lng),
+                              geolocation_lat = mean(geolocation_lat),
+                              payment_value = mean(payment_value)
+               ) %>% drop_na()
+
+values <-
+               c(brewer.pal(9, "Set1"),
+                 brewer.pal(9, "RdPu"),
+                 brewer.pal(9, "YlOrBr"))
+
+
+               j2 %>% leaflet() %>% addTiles() %>% addProviderTiles(provider = providers$Esri.WorldTopoMap) %>%
+               addProviderTiles(provider = providers$HERE.mapLabels) %>% addProviderTiles(providers$Stamen.TonerLines) %>% addCircleMarkers(
+                              lng =  ~ geolocation_lng,
+                              lat =  ~ geolocation_lat,
+                              label =  ~ paste(payment_type, "-", geolocation_state),
+                              radius = ~ sqrt(payment_value),
+                              group = ~ geolocation_state,
+                              color = ~ values
+               ) %>% addLayersControl(overlayGroups = c(j2$geolocation_state, j2$payment_type))
+
+"Duplicated recoreds, Because of the first time in cleaning mistakes, I can't visualize it within city. Likewise, State scope is a potential choice"
+
+#Number of customers in each year (The trend of the number)
+
+##Is customer_id unique in orders dataset?
+table(duplicated(orders$customer_id))
+"Yes"
+
+time_line_dt <-
+               orders %>% select(customer_id, order_approved_at) %>% mutate(order_approved_at =
+                                                                                           as.yearmon(as.Date(order_approved_at)),
+                                                                            year = year(as.Date(order_approved_at))) %>% group_by(order_approved_at, year) %>%
+               count()%>%drop_na()%>%ungroup()
+
+gg<-time_line_dt %>% ggplot(aes(x = factor(order_approved_at), y = n)) + geom_line(aes(group =
+                                                                                       year, color = factor(year)), lwd = 2) + theme(axis.text.x = element_text(angle = 90, vjust =
+                                                                                                                                                                    1,color = "red",size = 12),legend.title = element_blank()) + scale_color_manual(values = c("red", "green", "yellow")) + geom_point(fill ="darkorchid", size = 3,shape=21)+xlab("Date")+ylab("Number of Userid")+labs(title="The increasing of number userid in each year")+scale_y_continuous(labels = comma)
+
+
+
+ggplotly(gg)
+gg+coord_polar()
+
+```
+
+<hr>
+
+## Sellers Perspective
+
+```{r, warning=FALSE, message=FALSE,fig.align="left",fig.width=8,fig.height=8,echo=FALSE }
+
+#Statistic in column for city and state
+gg <-
+               sellers %>% group_by(seller_state) %>% count() %>% arrange(desc(n)) %>% ggplot(aes(
+                              x = fct_reorder(seller_state, n),
+                              y = n,
+                              label = n,
+                              fill = seller_state
+               )) + geom_col() + theme(axis.text.x = element_text(angle = 90, vjust = 1)) +
+               coord_flip() + labs(title = "Number of sellers in each state") + xlab("Brazilian State") +
+               ylab("Number of sellers ") + scale_y_continuous(labels = comma)
+ggplotly(gg)
+
+gg <-
+               sellers %>% mutate(a = fct_lump(seller_city,30)) %>% group_by(a) %>% count() %>%
+               ggplot(aes(
+                              x = fct_reorder(a, n),
+                              y = n,
+                              label = n,
+                              fill = a
+               )) + geom_col() + theme(axis.text.x = element_text(angle = 90, vjust = 1),
+                                       legend.title = element_blank()) + coord_flip() + labs(title = "Number of sellers in each most city") +
+               xlab("Brazilian city") + ylab("Number of sellers ") + scale_y_continuous(labels = comma)
+ggplotly(gg)
+
+
+
+#Draw the geographical map for city and state
+
+"Cities"
+##Prepare data set
+j_sel<-sellers%>%select_at(vars(seller_city,seller_zip_code_prefix,seller_state))%>% group_by(seller_city)%>%count()
+
+"Cities that have equal and more than 100 sellers"
+j_geo<- geolocation %>%select_at(vars(geolocation_zip_code_prefix,geolocation_lat,geolocation_lng,geolocation_state,geolocation_city))%>%unique.data.frame()%>%group_by(geolocation_city)%>%summarise(geolocation_lng=mean(geolocation_lng),geolocatio_lat=mean(geolocation_lat))
+
+"This dataset have some duplicated rows, the long and lat of different cities are the same"
+j_sel_geo<- inner_join(j_sel,j_geo,by=c("seller_city"="geolocation_city"))%>%mutate(popup=paste(seller_city,"-",n))
+
+##Draw the map (sellers map_city map)
+
+j_sel_geo%>%leaflet()%>%addTiles()%>% addTiles() %>% addProviderTiles(provider = providers$Esri.WorldTopoMap) %>%
+               addProviderTiles(provider = providers$HERE.mapLabels) %>% addProviderTiles(providers$Stamen.TonerLines) %>%addCircleMarkers(lng=~geolocation_lng,lat=~geolocatio_lat,popup = ~popup,radius = ~sqrt(n)/5,label=~seller_city,color ="black",fill="white")%>%addPopups(lng = ~geolocation_lng,lat=~geolocatio_lat,popup = ~popup,options = popupOptions(closeOnClick = FALSE))
+
+"States"
+##Prepare data set
+j_sel<-sellers%>%select_at(vars(seller_city,seller_zip_code_prefix,seller_state))%>% group_by(seller_state)%>%count()
+
+"There are 27 states in Brazil"
+
+j_geo<- geolocation %>%select_at(vars(geolocation_zip_code_prefix,geolocation_lat,geolocation_lng,geolocation_state,geolocation_city))%>%unique.data.frame()%>%group_by(geolocation_state)%>%summarise(geolocation_lng=mean(geolocation_lng),geolocatio_lat=mean(geolocation_lat))
+
+"This dataset have some duplicated rows, the long and lat of different cities are the same"
+
+j_sel_geo<- inner_join(j_sel,j_geo,by=c("seller_state"="geolocation_state"))%>%mutate(popup=paste(seller_state,"-",n))
+
+##Draw the map (sellers map_ state map)
+
+j_sel_geo%>%leaflet()%>%addTiles()%>% addTiles() %>% addProviderTiles(provider = providers$Esri.WorldTopoMap) %>%
+               addProviderTiles(provider = providers$HERE.mapLabels) %>% addProviderTiles(providers$Stamen.TonerLines) %>%addCircleMarkers(lng=~geolocation_lng,lat=~geolocatio_lat,popup = ~popup,radius = ~sqrt(n)/5,label=~seller_state,color ="black",fill="white")%>%addPopups(lng = ~geolocation_lng,lat=~geolocatio_lat,popup = ~popup,options = popupOptions(closeOnClick = FALSE))
+
+
+#Number of sellers in each year (The trend of the number)
+
+it<-items%>%mutate(value=price*order_item_id)%>%group_by(order_id,seller_id)%>%summarise(value=sum(value),freight_value=sum(freight_value))%>%ungroup()
+
+j_it_or<- left_join(it,orders,by="order_id")%>%select(seller_id,order_approved_at,freight_value,value)%>%transmute(order_approved_at=as.yearmon(as.Date(order_approved_at,format="%Y-%m-%d")),seller_id,freight_value,value,year=year(order_approved_at))
+
+
+
+time_line_dt <-j_it_or %>% group_by(order_approved_at, year) %>% count()%>%drop_na()%>%ungroup()
+
+gg<-time_line_dt %>% ggplot(aes(x = factor(order_approved_at), y = n)) + geom_line(aes(group =
+                                                                                       year, color = factor(year)), lwd = 2) + theme(axis.text.x = element_text(angle = 90, vjust =
+                                                                                                                                                                    1,color = "red",size = 12),legend.title = element_blank()) + scale_color_manual(values = c("red", "green", "yellow")) + geom_point(fill ="darkorchid", size = 3,shape=21)+xlab("Date")+ylab("Number of Userid")+labs(title="The increasing of number sellers in each year")+scale_y_continuous(labels = comma)
+
+ggplotly(gg)
+gg+coord_polar()
+
+
+
+```
+
+
+# Product{.tabset .tabset-fade .tabset-pills}
+
+## Product Overview
+
+```{r, warning=FALSE, message=FALSE,fig.align="left",fig.width=8,fig.height=8,echo=FALSE }
+
+products<- products%>%drop_na(product_id,product_category_name)
+j_p_pn<- left_join(products,product_category_name,by="product_category_name")
+j_p_it<- left_join(items,j_p_pn,by="product_id")
+
+#Group the product based on their purchase times
+
+purchased_time<-j_p_it%>%group_by(product_category_name_english)%>%count()%>%mutate(number_purchased_time= ifelse(1<n & n<17,"1-17",ifelse(n>=17 & n<=50,"17-50",ifelse(n>50 & n<200,"50-200",ifelse(n>=200 & n<=500,"200-500",ifelse(n>500 & n<=2000,"500-2000",ifelse(n>2000 & n<=5000,"5000-7000","above 7000")))))))
+
+gg<-purchased_time%>%group_by(number_purchased_time)%>%summarise(n=sum(n))%>% ggplot(aes(x=fct_reorder(number_purchased_time,desc(n)),y=n,fill=number_purchased_time))+geom_col()+ggsci::scale_color_aaas()+xlab("Number of purchase times")+ylab("the frequency of each range")+labs(title="The plot of purchased times frequency")+coord_flip()
+
+ggplotly(gg)
+
+```
+
+## More specific in total product in each category, each month and each year
+
+```{r, warning=FALSE, message=FALSE,fig.align="left",fig.width=8,fig.height=8,echo=FALSE }
+
+j_p_it<-j_p_it %>%mutate(month=factor(month(shipping_limit_date)),year=factor(year(shipping_limit_date)))%>%group_by(product_category_name_english,year,month)%>%summarise(n=n())%>%mutate(number_purchased_time= ifelse(1<n & n<17,"1-17",ifelse(n>=17 & n<=50,"17-50",ifelse(n>50 & n<200,"50-200",ifelse(n>=200 & n<=500,"200-500",ifelse(n>500 & n<=700,"500-700","700-1000"))))))
+
+gg<-j_p_it%>%ggplot(aes(x=product_category_name_english,y=n))+geom_boxplot(color="darkorchid")+facet_wrap(~month+year)
+
+ggplotly(gg)
+
+
+```
+
+
+
