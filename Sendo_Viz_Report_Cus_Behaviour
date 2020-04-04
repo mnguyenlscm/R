@@ -1,0 +1,175 @@
+---
+title: "Sendo"
+date: "3/25/2020"
+theme: readable
+number_section: true
+hightligh: tango
+code_folding: hide
+fig.align: center
+output: html_document
+---
+
+
+
+```{r, warning=FALSE,message=FALSE,include=FALSE}
+
+setwd("C:/Users/DellPC/Desktop/ecommerce/vnecommerce")
+a
+suppressMessages(library(tidyverse))
+suppressMessages(library(plotly))
+suppressMessages(library(stringr))
+suppressMessages(library(stringi))
+suppressMessages(library(lubridate))
+suppressMessages(library(viridis))
+suppressMessages(library(ggsci))
+suppressMessages(library(patchwork))
+suppressMessages(library(RColorBrewer))
+theme_set(theme_minimal())
+
+
+
+sendo<-read.csv("sendo.csv",header=TRUE)
+tiki<- read.csv("tiki.csv",header=TRUE)
+
+pal<-c(brewer.pal(8,"PRGn"),brewer.pal(8,"YlOrRd"),brewer.pal(8,"BrBG"))
+
+sendo<-sendo%>% mutate(date=str_replace_all(date,pattern="T",replacement = " "))%>%mutate(date=as.POSIXct(date,format="%Y-%m-%d %H"))%>%mutate(hour=factor(hour(date)),weekday=factor(wday(date,abbr=TRUE,label=TRUE)))
+tiki<-tiki%>% mutate(date=str_replace_all(date,pattern="T",replacement = " "))%>%mutate(date=as.POSIXct(date,format="%Y-%m-%d %H"))%>%mutate(hour=factor(hour(date)),weekday=factor(wday(date,abbr=TRUE,label=TRUE)))
+
+gg1<-sendo%>% ggplot(aes(x=date,y=number))+geom_line(group=1,color="red",lwd=1)+xlab("Date")+ylab("Number of Searching for Sendo on google")+labs(title="The fluctuation of searching Sendo on Google")
+
+gg2<- sendo%>%group_by(hour)%>%summarise(number=sum(number))%>%ggplot(aes(x=fct_reorder(hour,desc(number)),y=number,fill=hour))+geom_col()+coord_flip()+xlab("Hour of a day")+ylab("The Frequency in each hour")+labs("The plot of searching Sendo on Google in each hour")+scale_color_manual(values = pal)
+
+gg3<- sendo%>%group_by(weekday)%>%summarise(number=sum(number))%>%ggplot(aes(x=fct_reorder(weekday,desc(number)),y=number,fill=weekday))+geom_col()+coord_flip()+xlab("weekday of a week")+ylab("The Frequency in each weekday")+labs("The plot of searching Sendo on Google in each weekday")+scale_fill_tron()
+
+gg4<-sendo%>%group_by(weekday,hour)%>%summarise(number=sum(number))%>%ggplot(aes(x=hour,y=weekday,fill=number,label=number))+geom_tile()+scale_fill_viridis(option="D")+geom_label()+xlab("Hour")+ylab("Weekday")+labs(title = "Sendo, Hour versus Weekday")+geom_label(label.size = 3, fill="white")
+
+gg5<-tiki%>%group_by(weekday,hour)%>%summarise(number=sum(number))%>%ggplot(aes(x=hour,y=weekday,fill=number,label=number))+geom_tile()+scale_fill_viridis(option="D")+geom_label()+xlab("Hour")+ylab("Weekday")+labs(title = "Tiki, Hour versus Weekday")+geom_label(label.size = 3, fill="white")
+
+```
+
+# Sendo Content {.tabset .tabset-fade .tabset-pills}
+
+## **MAIN_SENDO_STRATEGY**
+
+<font size="5"> The imperative customers of Sendo locate in countryside </font>
+
+
+## **These steps to approach these strategies**
+
+ - <font size="5">This research is focus on interactive ``TIME`` and ``NUMBER`` of Sendo Customer from Google datasets</font>
+
+ - <font size="5"> **Sendo** mainly focus on customer in countryside </font>
+ 
+ - <font size="5">Large time of drop **price promotion** ``(9h-11h-13h-15h-17h-19h-21h)``</font>
+ 
+ - <font size="5">Range of Product</font>
+
+![Tiki_Product](C:/Users/DellPC/Desktop/ecommerce/vnecommerce/Tiki_Product.jpg)
+
+
+![Sendo_Product](C:/Users/DellPC/Desktop/ecommerce/vnecommerce/Sendo_Product.jpg)
+ - 
+ 
+## **Achievement**
+
+ - <font size ="5"> By time of user's interaction </font>
+ - < font size="5"> Geolocation of customer achievement </font>
+
+
+
+
+
+
+               - <font size ="5">  Time to search on Google---> Time to work. </font>
+               - < font size ="5"> Location of customers ---> Where are customers from? </font>
+               - <font size = "5"> Range of product --> Price, Customer needed items? </font>
+               
+
+
+
+
+
+# Achievement{.tabset .tabset-fade .tabset-pills}
+
+![Sendo](C:/Users/DellPC/Desktop/ecommerce/vnecommerce/sendo.jpg)
+
+<font size="6"> Sendo and Tiki are  Vietnam start-up companieS in e-commerce. **But** THEY ARE VERY DIFFERENT FROM ``STRATEGY``.</font>
+
+
+
+<hr>
+
+ 
+## Time to go shopping
+
+```{r, warning=FALSE, message=FALSE,echo=FALSE,fig.align="left",fig.width=8,fig.height=7.5}
+
+ggplotly(gg1)
+
+```
+
+- <font size="5">The demand is very fluctuated, So We can conclude that Time is the key factor. </font>
+
+- <font size="5">Probability, It comes from Sales Promotion in each period of day</font>
+
+
+```{r, warning=FALSE, message=FALSE,echo=FALSE,fig.align="left",fig.width=8,fig.height=7.5}
+
+ggplotly(gg2)
+
+```
+
+-  <font size="5"> Unlike, many giant e-commerce. Sendo has variety of hour that customers spend their time to interact.</font>
+
+-  <font size="5"> In countryside, Time working is very flexible.</font>
+
+
+
+```{r, warning=FALSE, message=FALSE,echo=FALSE,fig.align="left",fig.width=8,fig.height=7.5}
+ggplotly(gg3)
+
+```
+
+ <font size="5"> The question is why **Sunday** is not the most interactive time of customers? </font>
+
+ <font size="5"> I totally suppose that this situation is not in city </font>
+
+```{r, warning=FALSE, message=FALSE,echo=FALSE,fig.align="left",fig.width=8,fig.height=7.5}
+gg4
+
+```
+-  <font size="5"> Please to look at the scope of slight color ``(the high number of customer interaction to Sendo website)`` </font>
+
+-  <font size="5"> Mainly Active from Tuesday to Friday, but not Sunday</font>
+
+``````{r, warning=FALSE, message=FALSE,echo=FALSE,fig.align="left",fig.width=8,fig.height=7.5}
+
+gg4/gg5
+
+```
+- <font size="5"> From graph title. There is a significant difference between Sendo and Tiki.</font>
+-  <font size="5"> Time of customer interaction to ``Tiki`` is **LESS** than that of ``Sendo``</font>
+
+## Location
+
+![Tiki_Location](C:/Users/DellPC/Desktop/ecommerce/vnecommerce/Tiki_Location.jpg)
+
+
+- <font size="5">Just mainly focus in HCMC and HaNoi. Largest city and Capital of Vietnam.</font>
+
+
+
+![Sendo_Location](C:/Users/DellPC/Desktop/ecommerce/vnecommerce/Sendo_Location.jpg)
+
+- <font size="5"> Main local place in around the VietNam </font>
+
+
+
+
+
+
+
+
+
+
