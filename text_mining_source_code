@@ -1,0 +1,880 @@
+---
+title: "Text_Mining"
+author: "Nguyen_LSCM"
+date: "4/4/2020"
+output: html_document
+---
+
+#Load packages
+```{r}
+install.packages("tidyverse")
+install.packages("tidytext")
+install.packages("widyr")
+install.packages("tidyr")
+install.packages("gutenbergr")
+install.packages("scales")
+install.packages("textdata")
+install.packages("wordcloud")
+install.packages("reshape2")
+install.packages("igraph")
+install.packages("grid")
+install.packages("tm")
+install.packages("Matrix")
+install.packages("topicmodels")
+install.packages("quanteda")
+
+```
+
+#Load libraries
+```{r}
+
+library(tidyverse)
+library(tidytext)
+library(tidyr)
+library(dplyr)
+library(widyr)
+library(kableExtra)
+library(textdata)
+library(ggplot2)
+library(wordcloud)
+library(reshape2)
+library(igraph)
+library(grid)
+library(tm)
+library(Matrix)
+library(topicmodels)
+library(quanteda)
+
+```
+
+#Preface
+##Outline
+
+1. Chapter 1: Outlines the tidy text format and ``unnest_tokens()`` function. It also introduces **the gutenbergr and janeaustenr packages**
+2.  Chapter 2: Shows how to perform `sentiment analysis` datasets
+3.  Chapter 3: Describe the `tf-idf()` statistics. The higher value is, the smaller density is
+4. Chapter 4: Introduce ``m-grams`` and how to analyze **word networks** in text using ``widyr`` package and ``ggraph`` packages
+
+Here are some chapters below that cover how to convert back and forth between tidy and nontidy formats
+
+5. Chapter 5: Introduces methods for tidying **document-term matrices and Corpus objects** from ``quanteda packages`` and ``tm package``
+
+6. Chapter 6: Explores the concept of topic modeling, and uses the ``tidy()`` method  to interpret and visualize the out from ``topicmodels`` package
+
+Practical cases are in real life datasets
+
+7. Chapter 7: Demonstrate how to apply in Twitter 
+8. Chapter 8: Explore metadata from over 32,000 NASA datasets (available in ``JSON``)
+9. Chapter 9: Analyze a dataset of ``Usenet`` messages from a diverse set of newgroups (focus on topics like politics, hockey, technology, atheism, and more) to understand patterns across the groups
+
+
+##Chapter 1
+<hr>
+
+#The Tidy Text Format
+Tidy data has a specific structure:
+* Each variable is a column.
+* Each observation is a row
+* Each type of observational unit is a table
+
+Tidy text format as being a *table with one token per row*
+
+##Contrasting Tidy Text with Other Data Structures
+- As we stated above, we define the tidy text format as being a table with *one token per row*
+
+*String*
+  Text can, of course, be stores as strings
+
+*Corpus*
+  These types of objects typically contain raw things annotated with additional metadata and details
+
+*Document-term matrix*
+  This is a sparse matrix describing a collection of documents with one row per each document and one column for each term. The value in the matrix is typically word count or tf_idf
+
+##The unnest_tokens function
+Emily  Dickinson wrote some lovely text in her time
+
+```{r}
+
+text<-c("Because I could not stop for Death-", "He kindly stopped for me-","The Carriage held but just ourselves-", "and Immortality")
+
+library(dplyr)
+text_df<- tibble(line=1:4, text=text)
+text_df
+
+```
+
+A tibble is a modern class  of data frame within R, available in the ``dplyr`` and ``tibble`` packages, that has a convenient print method, will not convert strings to factors, does not use row names. **Tibbles are great for use with tidy tools**
+
+```{r}
+
+library(tidytext)
+
+text_df %>% unnest_tokens(word,text)
+
+```
+
+![Image](C:/Users/DellPC/Desktop/Untitled1.png)
+
+#Tidying the Works of Jane Austen
+
+```{r}
+
+library(janeaustenr)
+library(dplyr)
+library(stringr)
+
+original_books<- austen_books()%>% group_by(book)%>% mutate(linenumber=row_number(),chapter=cumsum(str_detect(text,regex("^chapter [\\divxlc]",ignore_case = TRUE))))%>%ungroup()
+
+original_books
+
+library(tidytext)
+tidy_books<- original_books%>% unnest_tokens(word,text)
+
+tidy_books
+
+```
+
+This function uses the **tokenizers** package to separate each line of text in the original data frame into tokens. The default tokenizing is for `words`, but other options include `characters, n-grams, setences, lines, paragraphs, or separation aroung a regex path-tern`
+
+We also want to remove the words from `stop words` list, which are words not useful for an analysis
+
+```{r}
+data(stop_words)
+
+tidy_books<- tidy_books%>% anti_join(stop_words)
+
+```
+We will use ``count()`` to find the most common words in all the books as a whole
+
+```{r}
+
+library(ggplot2)
+
+tidy_books%>% count(word,sort=TRUE)%>%filter(n>600)%>% mutate(word=reorder(word,n))%>% ggplot(aes(word,n))+geom_col()+xlab(NULL)+coord_flip()
+
+```
+
+#The gutenbergr Package
+
+The `gutenbergr` package provides access to the public domain works from the **Project Gutenber** collection
+
+##Word Frequencies
+A common task in text mining is to look at word frequencies, just like we have done above for Jane Austen's novels, and to compare differen texts
+
+```{r}
+
+library(gutenbergr)
+
+hgwells<- gutenberg_download(c(35,36,5230,159))
+
+tidy_hgwells<- hgwells%>% unnest_tokens(word,text)%>%anti_join(stop_words)
+
+tidy_hgwells%>% count(word,sort=TRUE)
+
+bronte<- gutenberg_download(c(1260,768,969,9182,767))
+
+tidy_bronte<- bronte %>% unnest_tokens(word,text)%>% anti_join(stop_words)
+
+```
+
+Now, let's calcualte the frequency for each word in the workds of Jane Austen, the Bronte sisters, and H.G Wells by binding the data frames together.
+
+```{r}
+
+library(tidyr)
+frequency <-
+ bind_rows(
+    mutate(tidy_bronte, author ="Bronte_Sister"),
+    mutate(tidy_hgwells, author ="H.G_Wells"),
+    mutate(tidy_books, author = "Jane_Austen")
+) %>% mutate(word = str_extract(word, "[a-z']+")) %>% count(author, word) %>% group_by(author) %>% mutate(proportion =
+                                                                                                              n / sum(n)) %>% select(-n) %>% spread(author, proportion) %>% gather(author, proportion, Bronte_Sister:H.G_Wells)
+
+library(scales)
+
+ggplot(frequency, aes(
+  x = proportion,
+  y = Jane_Austen,
+  color = abs(Jane_Austen - proportion)
+)) +
+  geom_abline(color = "gray40", lty = 2) +
+  geom_jitter(
+    alpha = 0.1,
+    size = 2.5,
+    width = 0.3,
+    height = 0.3
+  ) +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+  scale_x_log10(labels = percent_format()) +
+  scale_y_log10(labels = percent_format()) +
+  scale_color_gradient(limits = c(0, 0.001),
+                       low = "darkslategray4",
+                       high = "gray75") +
+  facet_wrap( ~ author, ncol = 2) +
+  theme(legend.position = "none") +
+  labs(y = "Jane Austen", x = NULL)
+
+```
+###Correlation test
+```{r}
+
+cor.test(data = frequency[frequency$author == "Bronte_Sister",],
+~ proportion + Jane_Austen)
+
+cor.test(data = frequency[frequency$author == "H.G_Wells",],
+~ proportion + Jane_Austen)
+
+```
+
+**Summary**
+In this chapter, we explored wht we mean by tidy data when it comes to text, and how tidy data principle can be applied to natural language processing. When text is organized in a format with one token per row, tasks like removing stop words or cal-culating word frequencies are natural applications of familiar operations within the tidy tools ecosystem.
+
+##Chapter 2
+#Sentiment Analysis With Tidy Data
+
+In the previous chapter we explored in depth what we mean by th tidy text format and showed how this format can be used to approach questions about word frequency
+
+![Image](C:/Users/DellPC/Desktop/Untitled2.png)
+
+One way to analyze the sentiment of a text is to consider the text as a combanation of its individual words 
+
+##The sentiments Dataset
+As discussed above, there are a variety of methods and 
+
+```{r}
+
+library(tidytext)
+
+sentiments
+
+```
+The three general-purpose lexicons are
+
+* AFINN: wide range of emotional word
+* Bing: Positive and Negative
+* NRC: The range of [-5,5]
+
+```{r}
+
+get_sentiments("afinn")
+get_sentiments("bing")
+get_sentiments("nrc")
+
+#Sentiment Analysis with Inner Join
+library(janeaustenr)
+library(dplyr)
+library(stringr)
+
+tidy_books<- austen_books()%>%group_by(book)%>% mutate(linenumber=row_number(),chapter=cumsum(str_detect(text, regex("^chapter [\\divxlc]",ignore_case=TRUE))))%>% ungroup()%>% unnest_tokens(word,text)
+
+#Join with sentiments datasets 
+
+nrcjoy<- get_sentiments("nrc")%>% filter(sentiment=="joy")
+
+tidy_books%>% filter(book=="Emma")%>% inner_join(nrcjoy)%>%count(word,sort=TRUE)
+
+```
+We can visualize the emotional in each bunch of pages by just using the total number of positive minus the total number of negative
+
+```{r}
+
+library(tidyr)
+
+janeaustensentiment<- tidy_books%>% inner_join(get_sentiments("bing"))%>% count(book, index=linenumber %/% 80, sentiment)%>% spread(sentiment,n,fill=0)%>% mutate(sentiment=positive-negative)
+
+library(ggplot2)
+ggplot(janeaustensentiment,aes(index,sentiment,fill=book))+geom_col(show.legend = FALSE)+facet_wrap(~book,ncol=2,scales="free_x")
+
+```
+
+##Most Common Positive and Negative Words
+
+One advantage of having the data frame with both sentiment and word is that we can analyze word counts that contribute to each sentiment. By implementing ``count()`` here with arguments of both word and sentiment, we find out how much each word contributed to each  sentiment
+
+```{r}
+
+bing_word_counts<-tidy_books%>% inner_join(get_sentiments("bing"))%>% count(word,sentiment,sort=TRUE)%>% ungroup()
+
+bing_word_counts%>% group_by(sentiment)%>% top_n(10)%>% ungroup()%>%mutate(word=reorder(word,n))%>% ggplot(aes(word,n,fill=sentiment))+geom_col(show.legend = FALSE)+facet_wrap(~sentiment,scales="free_y")+labs(y="Contribution to sentiment",x=NULL)+coord_flip()
+
+```
+
+##Wordclouds
+
+We've seen that this tidy text mining approach works well with ``ggplot2``, but having our data in tidy format is useful for other plots as well
+
+For example, consider the wordcloud package, which uses base R graphics. Let's look at the most common words in Jane Austen's works as a whole again, but this time as a wordcloud.
+
+```{r}
+
+library(wordcloud)
+
+tidy_books%>% anti_join(stop_words)%>% count(word)%>%with(wordcloud(word,n,max.words=100))
+#wordcloud is just a expression, so we need a with function to make the space for this expression work
+
+```
+In other functions, such as ``comparison.cloud()``, you may need to turn the data frame into a matrix with ``reshape2`` package containing ``acast()``
+
+With ``comparison.cloud()``, Wordclouds are divided into 2 parts based on **bing sentiment**
+
+```{r}
+
+library(reshape2)
+
+tidy_books%>% inner_join(get_sentiments("bing"))%>% count(word,sentiment,sort=TRUE)%>%acast(word~sentiment,value.var = "n",fill = 0)%>% comparison.cloud(colors=c("gray20","gray80"),max.words = 100)
+
+```
+##Looking at Units Beyond Just Words
+
+Instead of just using "word" default, we can use other formats, such as "sentences", "n-grams",...
+
+Here are some examples that use the regex to extract the text.
+
+Extract and count the chapter number for each page
+
+```{r}
+
+austen_chapter<- austen_books()%>% group_by(book)%>% unnest_tokens(chapter,text,token="regex",pattern="Chapter|CHAPTER [\\dIVXLC]")%>% ungroup()
+
+austen_chapter%>% group_by(book)%>% summarise(chapters=n())
+
+```
+We can also use the frequency ratio to know what is the most negative chapter in books
+
+```{r}
+
+bingnegative<- get_sentiments("bing")%>% filter(sentiment=="negative")
+
+wordcounts<- tidy_books%>%group_by(book,chapter)%>%summarise(words=n())
+
+tidy_books%>%semi_join(bingnegative)%>%group_by(book,chapter)%>% summarise(negativewords=n())%>% left_join(wordcounts,by=c("book","chapter"))%>%mutate(ratio=negativewords/words)%>%filter(chapter!=0)%>%top_n(1)%>%ungroup()
+
+```
+
+ In Chapter 43 of Sense
+and Sensibility, Marianne is seriously ill, near death; and in Chapter 34 of Pride and
+Prejudice, Mr. Darcy proposes for the first time (so badly!). Chapter 46 of MansfieldPark is almost the end, when everyone learns of Henry’s scandalous adultery; Chapter
+15 of Emma is when horrifying Mr. Elton proposes; and in Chapter 21 of Northanger
+Abbey, Catherine is deep in her Gothic faux fantasy of murder. Chapter 4 of Persua‐
+sion is when the reader gets the full flashback of Anne refusing Captain Wentworth,
+how sad she was, and what a terrible mistake she realized it to be
+
+##Chapter 3
+<hr>
+#Analyzing Word and Document Frequency: tf-idf
+
+A central question in text mining and natural language processing is how to quantify what a document is about. 
+
+One measure of how important a word may be is its `term frequency (tf)`, how frequently a word occurs in a document
+
+There are many frequent words in document, but maynot important , such as `the, of, is` and so forth. We might take the approach of adding words like these to a list of stop words and removing theme before analysis. But **The large difference in frequency may reduce the quality of content**. 
+
+Another approach is to look at term's *inverse document frequency (idf)*, which reduce the difference among these
+
+![Image](C:/Users/DellPC/Desktop/Untitled3.png)
+
+From this formular, we experience that the higher value idf of term is, the less frequent of term is
+
+##Term Frequency in Jane Austen's Novels
+Let us start by looking at the published novels of Jane Austen and first examine term frequency, then td-idf
+
+```{r}
+
+library(dplyr)
+library(janeaustenr)
+library(tidytext)
+
+book_words<- austen_books()%>% unnest_tokens(word,text)%>% count(book, word,sort=TRUE)%>%ungroup()
+
+total_words<- book_words%>% group_by(book)%>% summarise(total=sum(n))
+
+book_words<- left_join(book_words,total_words)
+
+```
+There are some usual words with the high frequency, such as "the", "and", "to", and so forth
+
+We will divide the n for total(n)
+
+```{r}
+
+library(ggplot2)
+
+ggplot(book_words,aes(n/total,fill=book))+geom_histogram(show.legend = FALSE)+xlim(NA,0.0009)+facet_wrap(~book,ncol=2,scales="free_y")
+
+```
+
+##Zipf's Law
+
+Zipf's law states that frequency that a word appears is inversely proportional to its rank
+
+```{r}
+
+freq_by_rank<- book_words%>% group_by(book)%>% mutate(rank=row_number(),`term frequency`=n/total)
+
+freq_by_rank%>%ggplot(aes(rank,`term frequency`, color=book))+geom_line(siz=1.1,alpha=0.8,show.legend = FALSE)+scale_x_log10()+scale_y_log10()
+
+```
+
+##The bind_tf_idf Function
+
+Th idea of tf-idf is to find the important words for the content of each document by decreasing the weight commonly used words and increasing the weight for words that are not used very much in a collection or corpus of documents.
+
+```{r}
+
+book_words<- book_words %>% bind_tf_idf(word,book,n)
+
+book_words%>% arrange(desc(tf_idf))%>%mutate(word=factor(word,levels=rev(unique(word))))%>%group_by(book)%>%top_n(15)%>%ungroup()%>%ggplot(aes(word,tf_idf,fill=book))+geom_col(show.legend = FALSE)+labs(x=NULL,y="tf-idf")+facet_wrap(~book,ncol=2,scales="free")+coord_flip()
+
+#This plot show some uncommon words within the top
+
+```
+
+##A Corpus of Physics Texts
+
+Let us work with another corpus of documents to see twhat terms are important in a different set of works. 
+
+
+```{r}
+
+library(gutenbergr)
+physics<- gutenberg_download(c(37729,14725.13476,5001),meta_fields="author")
+
+physics_words<- physics%>% unnest_tokens(word,text)%>% count(author,word,sort=TRUE)%>%ungroup()
+
+plot_physics<- physics_words%>% bind_tf_idf(word,author,n)%>%arrange(desc(tf_idf))%>%mutate(word=factor(word,levels = rev(unique(word))))%>% mutate(author=factor(author, levels = c("Galilei, Galileo",
+"Huygens, Christiaan",
+"Tesla, Nikola",
+"Einstein, Albert")))
+
+plot_physics%>% group_by(author)%>%top_n(15,tf_idf)%>%ungroup()%>%mutate(word=reorder(word,tf_idf))%>%ggplot(aes(word,tf_idf,fill=author))+geom_col(show.legend = FALSE)+labs(x=NULL,y="tf-idf")+facet_wrap(~author,ncol=2,scales="free")+coord_flip()
+
+```
+
+##Chapter 4
+<hr>
+
+#Relationships Between Words: N-grams and Correlations
+
+So far, we've considered words as individual units, and considered their relationships to sentiments or to documents.
+However, many interesting text analyses are based on the relationships between words, whether examining which words ten to follow others immediately
+
+##Tokenizing by N-gram
+
+We've been using the *unnest_tokens* function to tokenize by word, or sometimes by sentences
+
+We do this by adding the token="ngrams" option to *unnest_tokens()*, and setting n to the number of words we wish to capture in each n-gram. When we set n to 2, we are examining  pairs of 2 consecutive words, often called "bigrams":
+
+```{r}
+
+library(dplyr)
+library(tidytext)
+library(janeaustenr)
+
+ austen_bigrams<-austen_books()%>% unnest_tokens(bigram,text,token="ngrams",n=2)
+
+```
+##Counting and Filtering N-grams
+
+Our usual tidy tools apply equally well to n-gram analysis. We can examine the most comon bigrams using dplyr's count():
+
+```{r}
+
+austen_bigrams%>%count(bigram,sort=TRUE)
+
+```
+A lot of the most common bigrams are pars of common (unin-interesting) words, such as "of the" and "to be", what we call "stop words"
+
+This is useful to separate the bigram into 2 words, then  match with stop_words by inner_join 
+
+```{r}
+
+library(tidyr)
+
+bigrams_separated<- austen_bigrams%>%separate(bigram,c("word1","word2"),sep=" ")
+
+bigrams_filtered<- bigrams_separated%>% filter(!word1 %in% stop_words$word)%>%filter(!word2 %in% stop_words$word)
+
+bigram_count<- bigrams_filtered%>%count(word1,word2,sort=TRUE)
+
+bigram_count
+
+```
+
+We can see that names (whether first and last or with a salutation) are the mose com-mon pairs in Jane Austen books
+
+Now, It's time to unite 2 words to make a meaningful bigrams
+
+```{r}
+
+bigrams_united<- bigrams_filtered%>% unite(bigram,word1,word2,sep=" ")
+bigrams_united
+
+```
+
+In other Analyses you may be interested in the ose common trigrams, which are consecutive sequences of three words
+
+```{r}
+
+austen_books()%>% unnest_tokens(trigram,text,token="ngrams",n=3)%>% separate(trigram,c("word1","word2","word3"),sep=" ")%>% filter(!word1 %in% stop_words$word,!word2 %in% stop_words$word,!word3 %in% stop_words$word)%>%count(word1,word2,word3,sort=TRUE)
+
+```
+##Analyzing Bigrams
+
+This one-bigram-per-row format is helpful for exploratory analyses of the text. As a simple example, we might be interested in the most common "streets" mentioned in each book.
+
+```{r}
+
+bigrams_filtered %>% filter(word2=="street")%>%count(book,word1,sort=TRUE)
+
+bigram_tf_idf<- bigrams_united %>% count(book,bigram)%>% bind_tf_idf(bigram,book,n)%>% arrange(desc(tf_idf))
+
+
+```
+## Using Bigrams to Provide Context in Sentiment Analysis
+
+Our sentiment analysis approach in Chapter 2 simply counted the appearance of positive or negative words, according to a reference lexicon. 
+
+One of the problems with this approach is that a word's context can matter nearly as much as its presence. For example, the words "happy" and "like" will be counted as positive, even in a sentence like `"I'm not happy"`, `"I dont't like it"`
+
+```{r}
+
+bigrams_separated %>% filter(word1=="not")%>%count(word1,word2,sort=TRUE)
+
+```
+
+To know more the specific nature, we should use the "afinn" to have a quantited benchmark
+
+```{r}
+
+AFINN<- get_sentiments("afinn")
+
+not_words<- bigrams_separated%>% filter(word1=="not")%>% inner_join(AFINN,by=c(word2="word"))%>% count(word2,score=value,sort=TRUE)%>% ungroup()
+
+not_words%>% mutate(contribution=n*score)%>%arrange(desc(abs(contribution)))%>% head(20)%>% mutate(word2=reorder(word2,contribution))%>%ggplot(aes(word2,n*score,fill=n*score>0))+geom_col(show.legend = FALSE)+xlab("Words preceded by \"not\"")+ylab("Sentiment score * number of occurences")+coord_flip()
+
+```
+
+The bigrams "not like" and "not help" were overwhelmingly the largest causes of mis-identification.
+
+So maybe, We can misunderstand the status situation.
+
+Now, let us dive some other aspects, such as "not, no , never, without"
+
+```{r}
+negation_words<- c("not","no","never","without")
+negated_words<- bigrams_separated %>% filter(word1 %in% negation_words)%>% inner_join(AFINN, by=c(word2="word"))%>% count(word1,word2,score=value,sort=TRUE)%>% ungroup()
+
+negated_words%>% ggplot(aes(x=word2,y=n*score,fill=n*score))+geom_col()+facet_wrap(~word1)
+
+```
+
+##Visualizing a Network of Bigrams wih ggraph
+
+We may be interested in visualizing all of the relationships among words simultane-ously, rather than just the top few at a time. As one common visualization, we can arrange the words into a network, or "graph". Here we'l be referring to a graph not in the sense of a visualization, but as a combination of connected nodes. A graph can be constructed from a tidy object since it has 3 variables:
+
+**from**
+
+- The node an edge is coming from
+
+**to**
+
+- The node an edge is going toward
+
+**weight**
+
+- A numeric value associated with each edge 
+
+```{r}
+
+library(igraph)
+
+bigram_graph<- bigram_count%>% filter(n>20)%>%graph_from_data_frame()
+
+```
+**graph_from_data_frame** create the coming from and the going toward points to create the core based platform for adding some other features
+
+```{r}
+
+library(ggraph)
+set.seed(2017)
+
+ggraph(bigram_graph,layout="fr")+geom_edge_link()+geom_node_point()+geom_node_text(aes(label=name),vjust=1,hjust=1)
+
+```
+We conclude with a fre polishing operations to make a better-looking graph 
+- We add the *edge_alpha* aesthetic to the link layer to make links transparent based on how common or rare the bigram is
+- We add directionality with an arrow, constructed using *grid::arrow()*, including an *end_cap* option that tells the arrow to end before touching the node
+- We tinker with the options to the node layer to make the nodes more attractive
+- We add a theme that's useful for plotting networks, theme_void()
+
+
+```{r}
+
+set.seed(2016)
+
+a<- grid::arrow(type="closed",length=unit(.15,"inches"))
+
+ggraph(bigram_graph,layout="fr")+geom_edge_link(aes(edge_alpha=n),show.legend=FALSE,arrow=a,end_cap=circle(.07,"inches"))+geom_node_point(color="lightblue",size=5)+geom_node_text(aes(label=name),vjust=1,hjust=1)+theme_void()
+
+```
+
+##Counting and Correlating Pairs of Words with the widyr Package
+
+Tokenizing by n-gram is a useful way to explore pairs of adjacent words. However, we may also be interested in words that tend to co-occur within particular documents or particular chapters, even if they don't  occur next to each other
+
+It helps you can compare the effects between 2 words within 2 scopes (words and other choice (eg: page1:page10,...)
+
+##Counting and Correlating Among Sections
+
+```{r}
+
+austen_section_words<- austen_books()%>%filter(book=="Pride & Prejudice")%>% mutate(section=row_number()%/%10)%>% filter(section>0)%>%  unnest_tokens(word,text)%>%filter(!word %in% stop_words$word)
+library(widyr)
+word_pairs<- austen_section_words%>% pairwise_count(word,section,sort=TRUE)
+
+"Choose the word darcy"
+
+word_pairs%>% filter(item1=="dancy")
+
+```
+
+![Image](C:/Users/DellPC/Desktop/Untitled4.png)
+```{r}
+
+word_cors<- austen_section_words%>% group_by(word)%>%filter(n()>=20)%>%pairwise_cor(word,section,sort=TRUE)
+word_cors
+
+word_cors%>% filter(item1=="pounds")
+
+set.seed(2016)
+a<- grid::arrow(type="closed",length=unit(.15,"inches"))
+
+word_cors%>%filter(correlation>.15)%>% graph_from_data_frame()%>% ggraph(layout="fr")+geom_edge_link(aes(edge_alpha=correlation),show.legend=FALSE,arrow=a,end_cap=circle(.07,"inches"))+geom_node_point(color="lightblue",size=5)+geom_node_text(aes(label=name),repel=TRUE)+theme_void()
+
+```
+##Summary
+
+This chapter showed how the tidy text approach is useful not only for analyzing individual words, but also for exploring the relationships and connections between words
+
+##Chapter 5
+<hr>
+
+#Converting to and from Nontidy Formats
+
+In the previous chapters, we've been analyzing text arranged in the tidy text format: a table with one token per document per row, such as is constructed by the function *unnest_tokens()*. This lets us use the popular suuite of tidy tools such as dplyr, tidyr, and ggplot2 to explore and visualize text data
+
+![Image](C:/Users/DellPC/Desktop/Untitled5.png)
+##Tidying a Document-Term matrix
+
+In tidy format 
+- Each row resprent each document
+
+
+
+One of the most common structures that text mining packages work with is the documnt-term-matrix or DTM). This is a matrix where:
+
+- Each row represents one document
+- Each column represents one term
+- Each value (typically) contains the number of appearances of that term in that document
+
+Since most pairings of document and term do not occur (they have the value zero), DTMS are usually implemented as sparse matrices. These objects can be treated as though they were matrices (for example, accessing particular rows and columns)
+
+DTM objects cannot be used directly with tidy tools, just as tidy data frames cannot be used as input for most text mining packages. Thus, the tidytext package provides 2 verbs that convert between the 2 formats:
+
+- *tidy()* turn DTM into a tidy data frame (tokenizing format)
+- *cast()* turn a tidy one term-per-row data frame into a matrix. Tidytext provides 3 variations of this verb, each converting to a different type of matrix
+- *cast_sparse()* converts to a sparse matrix from Matrix package
+- *cast_dtm()* converts to a DTM object from *tm*
+- *cast_dfm()* converts to a *dfm* object from *quanteda*
+
+##Tidying DocumentTermMatrix Objects
+
+Perhaps the most widely used implementation of DTMs in R is the DocumentTermMatrix class in the tm package
+
+```{r}
+
+library(tm)
+data("AssociatedPress")
+
+AssociatedPress
+
+```
+
+```{r}
+
+"To extract the term from DTM. Terms function is used for this case"
+
+terms<- Terms(AssociatedPress)
+
+"This shows in matrix format"
+head(terms)
+
+```
+
+```{r}
+
+library(dplyr)
+library(tidytext)
+
+ap_td<- tidy(AssociatedPress)
+ap_td 
+
+"Notice that only the nonzero values are included in the tidied out‐
+put: document 1 includes terms such as “adding” and “adult,” but
+not aaron” or abandon.” This means the tidied version has no
+rows where count is zero."
+
+ap_sentiments<- ap_td%>%inner_join(get_sentiments("bing"),by=c(term="word"))
+
+ap_sentiments
+
+library(ggplot2)
+
+ap_sentiments%>% count(sentiment,term,wt=count)%>%ungroup()%>%filter(n>=200)%>%mutate(n>=200)%>% mutate(n=ifelse(sentiment=="negative",-n,n))%>%mutate(term=reorder(term,n))%>%ggplot(aes(term,n,fill=sentiment))+geom_bar(stat="identity")+ylab("Contribution to sentiment")+coord_flip()
+
+```
+
+##Tidying dfm Objects
+
+Other text mining packages provide alternative implementations of DTM, such as dfm (document-feature matrix) class from quanteda package
+
+```{r}
+
+library(methods)
+data("data_corpus_inaugural",package="quanteda")
+inaug_dfm<- quanteda::dfm(data_corpus_inaugural,verbose=FALSE)
+
+inaug_td<-tidy(inaug_dfm)
+
+
+```
+
+##Casting Tidy Text Data into a Matrix
+
+Just as some existing text mining packages provide document term matrices as sample data or output, some algorithm expect such matrices as input. Therefore, tidytext provides *cast_verbs* for converting from a tidy form to these matrices
+
+```{r}
+
+ap_td%>%cast_dtm(document,term,count)
+
+library(Matrix)
+m<- ap_td%>% cast_sparse(document,term,count)
+
+```
+This kind of conversion could easily be done from any of tidy text structures we've used so far in this book. For example, we could create a DTM of Jane Austen's books in just a few lines of code
+
+```{r}
+
+library(janeaustenr)
+austen_dtm<- austen_books()%>%unnest_tokens(word,text)%>% count(book,word)%>%cast_dtm(book,word,n)
+
+austen_dtm
+
+```
+
+##Chapter 6
+<hr>
+
+#Topic Modeling
+
+In text mining, we often have collections of documents, such as blog post or news articles, that we'd like to divide into natural groups so that we can understand them separately. Topic modeling is a method for unsupervised classification of such documents, similar to clustering on numeric data, which finds natural groups of items even when we're not sure what we're looking for.
+
+**Latent Dirichlet allocation (LDA)** is a particularly popular method for fitting a topic model. It reats each document as a mixture of topics, and each topic as a mixture of words
+
+![Image](C:/Users/DellPC/Desktop/Untitled6.png)
+
+##Latent Dirichlet Allocation
+
+Laten Dirichlet allocation is one of the most common algorithms for topic modelling. 
+
+- Every document is a mixture of topics: Document 1 is 90% topic A and 10% topic B, while Document 2 is 30% topic A and 70% topic B
+
+- Every topic is a mixture of words: President, Cogress and goverment are from *politics*
+
+
+```{r}
+
+library(topicmodels)
+data("AssociatedPress")
+
+AssociatedPress
+
+```
+We can use the LDA() function from topicmodels packge, setting k=3, to create 2 topic LDA model
+
+```{r}
+
+ap_lda<- LDA(AssociatedPress,k=2,control=list(seed=1234))
+ap_lda
+
+```
+##Word-Topic Probabilities
+
+In Chapter 5 we introduced the *tidy()* method, originally from *broom* package, for tidying model objcts. The *tidytext* package provides this method for extracting the per-topic-per-word probabilities, call ("beta") from the model
+
+```{r}
+
+library(tidytext)
+
+ap_topics<-tidy(ap_lda,matrix="beta")
+ap_topics
+
+```
+
+Notice that this has turned the model into a one-topic-per-term-per-row format. Beta is the probability of that term being generated from that topic
+
+```{r}
+
+library(ggplot2)
+library(dplyr)
+
+ap_top_terms<- ap_topics%>%group_by(topic)%>% top_n(10,beta)%>%ungroup()%>%arrange(topic,-beta)
+
+ap_top_terms%>% mutate(term=reorder(term,beta))%>%ggplot(aes(term,beta,fill=factor(topic)))+geom_col(show.legend=FALSE)+facet_wrap(~topic,scales="free")+coord_flip()
+
+```
+
+This visualization lets us understand the two topics that were extracted from the arti‐
+cles. The most common words in topic 1 include “percent,” “million,” “billion,” and
+“company,” which suggests it may represent business or financial news. Those most
+common in topic 2 include “president,” “government,” and “soviet,” suggeting that this
+topic represents political news
+
+**One important observation about the words in each topic is that some words, such as “new” and “people,” are common within both topics.**
+
+*This is an advantage of topic modeling as opposed to “hard clustering” methods: top‐
+ics used in natural language could have some overlap in terms of words.
+As an alternative, we could consider the terms that had the greatest difference in β between topic 1 and topic 2. This can be estimated based on the log ratio of the two: log2(B2/B1)*
+
+```{r}
+
+library(tidyr)
+beta_spread<- ap_topics%>% mutate(topic=paste0("topic",topic))%>%spread(topic,beta)%>%filter(topic1>.001|topic2 > .001)%>%mutate(log_ratio=log2(topic2/topic1))
+
+beta_spread
+
+```
+
+##Document-Topic Probabilities
+
+Besides estimating each topic as a mixture of words, LDA also models each document as a mixture of topics
+
+```{r}
+
+ap_documents<-tidy(ap_lda,matrix="gamma")
+ap_documents
+
+```
+
+Document 6 is quite high relevant to topic 2
+
+##By-Word Assignments:augement
+
+One step of LDA algorithm is assigning each word in each document to a topic
+
+##Summary
+
+This chapter introduced topic modeling for finding clusters of words that characterize a set of documents, and shoed hoe the **tidy()** verb lets us explore and understand these models using dplyr and ggplot2
+
+
