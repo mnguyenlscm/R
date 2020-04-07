@@ -1,0 +1,180 @@
+---
+title: "job_title"
+author: "Nguyen_LSCM"
+date: "4/7/2020"
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+suppressMessages(library(tidyverse))
+suppressMessages(library(scales))
+suppressMessages(library(ggraph))
+suppressMessages(library(igraph))
+suppressMessages(library(tidyr))
+suppressMessages(library(tidytext))
+suppressMessages(library(DT))
+suppressMessages(library(wordcloud))
+suppressMessages(library(wordcloud2))
+suppressMessages(library(plotly))
+
+
+setwd("C:/Users/DellPC/Desktop/R_source_code")
+txt<-read.csv("txt.csv",stringsAsFactors = FALSE)
+
+colnames(txt)<-c("act","description","requirement")
+txt1<- txt %>%transmute(act=str_to_lower(act),description=str_to_lower(description),requirement=str_to_lower(requirement))
+
+
+
+```
+
+# Content {.tabset}
+
+## General Activities
+
+```{r,warning=FALSE,message=FALSE,echo=FALSE,fig.align="left",fig.height=10,fig.width=10}
+
+txt1_act<- txt1%>%transmute(act=str_remove(act,pattern = "[:punct:]"))%>%filter(str_detect(act,pattern = "[:alpha:]"))%>%transmute(act=as.character(act))
+
+txt1_act<-txt1_act%>%unnest_tokens(word,act)
+
+gg <-
+               txt1_act %>% group_by(word) %>% count(sort = TRUE) %>% anti_join(stop_words) %>%
+               head(20) %>% ggplot(aes(x = reorder(str_to_title(word), n), y = n)) + geom_bar(
+                              stat = "identity",
+                              fill = "darkorchid",
+                              color = "black",
+                              alpha = 0.6
+               ) + coord_flip() + theme_minimal() + labs(title = "Top word of Tiki business model") +
+               xlab("Frequency") + ylab("General Activity")
+
+ggplotly(gg)
+
+
+df<-txt1_act %>% group_by(word) %>% count(sort = TRUE) %>% anti_join(stop_words)
+
+wordcloud2(df, size = 1, minSize = 0, gridSize =  0,
+           fontFamily = 'Segoe UI', fontWeight = 'bold',
+           color = 'random-dark', backgroundColor = "lightblue",
+           minRotation = -pi/4, maxRotation = pi/4, shuffle = TRUE,
+           rotateRatio = 0.8, shape = 'triangle', ellipticity = 0.65,
+           widgetsize = NULL, figPath = NULL, hoverFunction = NULL)
+
+
+
+stop<-data.frame(stop=c("of to a and as of in to an in are is am this that there those out  at must S also with  so but  then can even date  for you  our be  more happiness bring"))%>%mutate(stop=as.character(stop))
+stop_w<- stop%>%unnest_tokens(w,stop)
+
+bigram<-txt1%>%transmute(act=str_remove(act,pattern = "[:punct:]"))%>%filter(str_detect(act,pattern = "[:alpha:]"))%>%transmute(act=as.character(act))%>%unnest_tokens(word,act,token = "ngrams",n=2)%>%separate(word,c("word1","word2"),sep=" ")%>%filter(!word1 %in% stop_words,!word2 %in% stop_words)%>%anti_join(stop_w,by=c("word1"="w"))%>%anti_join(stop_w,by=c("word2"="w"))
+
+bigram1<-bigram%>%unite(word,word1:word2,sep=" ")%>%count(word,sort = TRUE)
+
+bigram1%>%with(wordcloud(words=word,freq=n/10,max.words=100,colors = c(brewer.pal(8,"Set1"))))
+
+
+
+bigram1_graph<- bigram%>%count(word1,word2,sort=TRUE)%>%head(100)%>%head(100)%>%graph_from_data_frame()
+
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram1_graph, layout = "fr") + geom_edge_link(
+               aes(edge_alpha = n,edge_width=n),edge_colour="darkred") + geom_node_point(color = "royalblue", size=5) + geom_node_text(aes(label = name),repel=TRUE,point.padding=unit(0.2,"lines"), vjust = 1, hjust = 1) +theme_void()
+
+
+```
+
+## Job Description
+
+```{r,warning=FALSE,message=FALSE,echo=FALSE,fig.align="left",fig.width=10,fig.height=10}
+
+txt1_description<- txt1%>%transmute(description=str_remove(description,pattern = "[:punct:]"))%>%filter(str_detect(description,pattern = "[:alpha:]"))%>%transmute(description=as.character(description))
+
+txt1_description<-txt1_description%>%unnest_tokens(word,description)
+
+gg <-
+               txt1_description %>% group_by(word) %>% count(sort = TRUE) %>% anti_join(stop_words) %>%
+               head(20) %>% ggplot(aes(x = reorder(str_to_title(word), n), y = n)) + geom_bar(
+                              stat = "identity",
+                              fill = "darkorchid",
+                              color = "black",
+                              alpha = 0.6
+               ) + coord_flip() + theme_minimal() + labs(title = "Top word of Tiki business model") +
+               xlab("Frequency") + ylab("General descriptionivity")
+
+ggplotly(gg)
+
+
+df<-txt1_description %>% group_by(word) %>% count(sort = TRUE) %>% anti_join(stop_words)
+
+df%>%with(wordcloud(words=word,freq=n/100,max.words=100,colors = c(brewer.pal(8,"Set1"))))
+
+
+
+
+stop<-data.frame(stop=c("of to a and as of in to an in are is am this that there those out  at must S also with  so but  then can even date  for you  our be  more happiness bring"))%>%mutate(stop=as.character(stop))
+stop_w<- stop%>%unnest_tokens(w,stop)
+
+bigram<-txt1%>%transmute(description=str_remove(description,pattern = "[:punct:]"))%>%filter(str_detect(description,pattern = "[:alpha:]"))%>%transmute(description=as.character(description))%>%unnest_tokens(word,description,token = "ngrams",n=2)%>%separate(word,c("word1","word2"),sep=" ")%>%filter(!word1 %in% stop_words,!word2 %in% stop_words)%>%anti_join(stop_w,by=c("word1"="w"))%>%anti_join(stop_w,by=c("word2"="w"))
+
+bigram1<-bigram%>%unite(word,word1:word2,sep=" ")%>%count(word,sort = TRUE)
+
+bigram1%>%with(wordcloud(words=word,freq=n/10,max.words=100,colors = c(brewer.pal(8,"Set1"))))
+
+
+bigram1_graph<- bigram%>%count(word1,word2,sort=TRUE)%>%filter(n>1)%>%head(100)%>%graph_from_data_frame()
+
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram1_graph, layout = "fr") + geom_edge_link(
+               aes(edge_alpha = n,edge_width=n),edge_colour="darkred") + geom_node_point(color = "royalblue", size=5) + geom_node_text(aes(label = name),repel=TRUE,point.padding=unit(0.2,"lines"), vjust = 1, hjust = 1) +theme_void()
+
+```
+
+## Requirement 
+
+```{r,warning=FALSE,message=FALSE,echo=FALSE,fig.align="left",fig.width=10,fig.height=10}
+
+txt1_requirement<- txt1%>%transmute(requirement=str_remove(requirement,pattern = "[:punct:]"))%>%filter(str_detect(requirement,pattern = "[:alpha:]"))%>%transmute(requirement=as.character(requirement))
+
+txt1_requirement<-txt1_requirement%>%unnest_tokens(word,requirement)
+
+gg <-
+               txt1_requirement %>% group_by(word) %>% count(sort = TRUE) %>% anti_join(stop_words) %>%
+               head(20) %>% ggplot(aes(x = reorder(str_to_title(word), n), y = n)) + geom_bar(
+                              stat = "identity",
+                              fill = "darkorchid",
+                              color = "black",
+                              alpha = 0.6
+               ) + coord_flip() + theme_minimal() + labs(title = "Top word of Tiki business model") +
+               xlab("Frequency") + ylab("General requirementivity")
+
+ggplotly(gg)
+
+
+df<-txt1_requirement %>% group_by(word) %>% count(sort = TRUE) %>% anti_join(stop_words)
+
+df%>%with(wordcloud(words=word,freq=n/10,max.words=100,colors = c(brewer.pal(8,"Set1"))))
+
+
+
+
+stop<-data.frame(stop=c("of to a and as of in to an in are is am this that there those out  at must S also with  so but  then can even date  for you  our be  more happiness bring"))%>%mutate(stop=as.character(stop))
+stop_w<- stop%>%unnest_tokens(w,stop)
+
+bigram<-txt1%>%transmute(requirement=str_remove(requirement,pattern = "[:punct:]"))%>%filter(str_detect(requirement,pattern = "[:alpha:]"))%>%transmute(requirement=as.character(requirement))%>%unnest_tokens(word,requirement,token = "ngrams",n=2)%>%separate(word,c("word1","word2"),sep=" ")%>%filter(!word1 %in% stop_words,!word2 %in% stop_words)%>%anti_join(stop_w,by=c("word1"="w"))%>%anti_join(stop_w,by=c("word2"="w"))
+
+bigram1<-bigram%>%unite(word,word1:word2,sep=" ")%>%count(word,sort = TRUE)
+
+bigram1%>%with(wordcloud(words=word,freq=n/10,max.words=100,colors = c(brewer.pal(8,"Set1"))))
+
+
+
+bigram1_graph<- bigram%>%count(word1,word2,sort=TRUE)%>%filter(n>1)%>%head(100)%>%graph_from_data_frame()
+
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram1_graph, layout = "fr") + geom_edge_link(
+               aes(edge_alpha = n,edge_width=n),edge_colour="darkred") + geom_node_point(color = "royalblue", size=5) + geom_node_text(aes(label = name),repel=TRUE,point.padding=unit(0.2,"lines"), vjust = 1, hjust = 1) +theme_void()
+
+```
