@@ -1,0 +1,223 @@
+---
+title: "Logistics Serivces"
+author: "NguyenLSCM"
+date: "April 18 2020"
+output:
+               flexdashboard::flex_dashboard:
+               theme: readable
+               highlight: tango
+---
+
+```{r,include=FALSE}
+library(tidyverse)
+library(DT)
+library(dygraphs)
+library(scales)
+library(RColorBrewer)
+library(viridis)
+library(arules)
+library(lubridate)
+library(tidyr)
+library(purrr)
+library(gridExtra)
+library(skimr)
+library(xts)
+library(zoo)
+library(plotly)
+library(leaflet)
+library(rjson)
+library(flexdashboard)
+
+```
+
+```{r, include=FALSE}
+
+setwd("C:/Users/DellPC/Desktop/R_source_code")
+df<-read.csv("global_superstore.csv")
+us_state<-read.csv("us_state.csv",header=TRUE)
+dt<-df%>%mutate(Order.Date=as.Date(Order.Date,format="%m/%d/%Y"),Ship.Date=as.Date(Ship.Date,format="%m/%d/%Y"))%>%mutate(leadtime=Ship.Date-Order.Date)%>%na.omit()
+
+```
+
+
+
+```{r,include=FALSE}
+
+skimr::skim(dt)
+
+
+```
+
+<style>                     
+.navbar {
+  background-color:red;
+  border-color:black;
+}
+.navbar-brand {
+color:black!important;
+}
+</style>  
+
+``` {js}
+// Inverse color of navigation bar.
+$('.navbar-inverse').removeClass('navbar-inverse').addClass('navbar-default');
+```
+Customer 
+===============================================================
+
+Column {data-height=750} {.tabset .tabset-fade .tabset-pills}
+-----------------------------------------------------------------
+
+### First Class
+
+```{r, echo=FALSE, fig.width=8,fig.height=8}
+
+dt1<- dt%>%mutate(Ship.Mode=fct_recode(as.factor(Ship.Mode),"Same_Day"="Same Day","First_Class"="First Class","Second_Class"="Second Class","Standard_Class"="Standard Class"))
+
+df<-spread(data=dt1,key=Ship.Mode,value = leadtime)%>%select(c("Order.Date","First_Class","Second_Class","Same_Day","Standard_Class"))
+
+df<-df%>%mutate(First_Class=ifelse(is.na(First_Class),0,First_Class),Second_Class=ifelse(is.na(Second_Class),0,Second_Class),Standard_Class=ifelse(is.na(Standard_Class),0,Standard_Class),Same_Day=ifelse(is.na(Same_Day),0,Same_Day))
+
+
+First_Class<- df%>%select(First_Class,Order.Date)%>%mutate(Date=as.yearmon(Order.Date))%>%group_by(Date)%>%summarise(First_Class=sum(First_Class))
+First_Class<-ts(First_Class$First_Class, start=c(01,2014),frequency = 12)
+
+Second_Class<- df%>%select(Second_Class,Order.Date)%>%mutate(Date=as.yearmon(Order.Date))%>%group_by(Date)%>%summarise(Second_Class=sum(Second_Class))
+Second_Class<-ts(Second_Class$Second_Class, start=c(01,2014),frequency = 12)
+
+Standard_Class<- df%>%select(Standard_Class,Order.Date)%>%mutate(Date=as.yearmon(Order.Date))%>%group_by(Date)%>%summarise(Standard_Class=sum(Standard_Class))
+Standard_Class<-ts(Standard_Class$Standard_Class, start=c(01,2014),frequency = 12)
+
+Same_Day<- df%>%select(Same_Day,Order.Date)%>%mutate(Date=as.yearmon(Order.Date))%>%group_by(Date)%>%summarise(Same_Day=sum(Same_Day))
+Same_Day<-ts(Same_Day$Same_Day, start=c(01,2014),frequency = 12)
+
+dt_ts<-cbind(First_Class,Second_Class,Standard_Class,Same_Day)
+
+
+dygraph(First_Class,main="Lead time of First_CLass during the time",group="Class")%>%dyHighlight(highlightCircleSize = 7,highlightSeriesBackgroundAlpha = 1,hideOnMouseOut = TRUE)%>%dyAxis(name="x",label="First Class")%>%dyAxis(name="y",label="Lead time")%>%dyLegend(show ="follow",hideOnMouseOut = FALSE)%>%  dyShading(from = "2017-08-31", to = "2017-09-30", color = "#FFE6E6") %>%dyShading(from = "2017-11-10", to = "2017-12-10", color = "#CCEBD6")%>%dyRangeSelector(height=20)%>%dyOptions(fillGraph = TRUE,pointShape = "star",drawPoints = TRUE,colors = "palegreen",gridLineColor = "black",drawGrid = TRUE,strokeBorderColor = "white",pointSize = 5)%>%dySeries(label = "First Class")
+
+```
+
+### Second Class
+```{r, echo=FALSE, fig.width=8,fig.height=8}
+
+dygraph(Second_Class,main="Lead time of Second_CLass during the time",group="Class")%>%dyHighlight(highlightCircleSize = 7,highlightSeriesBackgroundAlpha = 1,hideOnMouseOut = TRUE)%>%dyAxis(name="x",label="Second Class")%>%dyAxis(name="y",label="Lead time")%>%dyLegend(show ="follow",hideOnMouseOut = FALSE)%>%  dyShading(from = "2017-08-31", to = "2017-09-30", color = "#FFE6E6") %>%dyShading(from = "2017-11-10", to = "2017-12-10", color = "#CCEBD6")%>%dyRangeSelector(height=20)%>%dyOptions(fillGraph = TRUE,pointShape = "star",drawPoints = TRUE,colors = "blue",gridLineColor = "black",drawGrid = TRUE,strokeBorderColor = "white",pointSize = 5)%>%dySeries(label = "Second Class")
+```
+
+### Standard Class
+
+```{r, echo=FALSE, fig.width=8,fig.height=8}
+dygraph(Standard_Class,main="Lead time of Standard_Class during the time",group="Class")%>%dyHighlight(highlightCircleSize = 7,highlightSeriesBackgroundAlpha = 1,hideOnMouseOut = TRUE)%>%dyAxis(name="x",label="Standard Class")%>%dyAxis(name="y",label="Lead time")%>%dyLegend(show ="follow",hideOnMouseOut = FALSE)%>%  dyShading(from = "2017-08-31", to = "2017-09-30", color = "#FFE6E6") %>%dyShading(from = "2017-11-10", to = "2017-12-10", color = "#CCEBD6")%>%dyRangeSelector(height=20)%>%dyOptions(fillGraph = TRUE,pointShape = "star",drawPoints = TRUE,colors = "black",gridLineColor = "black",drawGrid = TRUE,strokeBorderColor = "white",pointSize = 5)%>%dySeries(label = "Standard Class")
+```
+
+
+### Same Day
+
+```{r, echo=FALSE, fig.width=8,fig.height=8}
+dygraph(Same_Day,main="Lead time of Same_Day, during the time",group="Class")%>%dyHighlight(highlightCircleSize = 7,highlightSeriesBackgroundAlpha = 1,hideOnMouseOut = TRUE)%>%dyAxis(name="x",label="Same Day")%>%dyAxis(name="y",label="lead time")%>%dyLegend(show ="follow",hideOnMouseOut = FALSE)%>%  dyShading(from = "2017-08-31", to = "2017-09-30", color = "#FFE6E6") %>%dyShading(from = "2017-11-10", to = "2017-12-10", color = "#CCEBD6")%>%dyRangeSelector(height=20)%>%dyOptions(fillGraph = TRUE,pointShape = "star",drawPoints = TRUE,colors = "red",gridLineColor = "black",drawGrid = TRUE,strokeBorderColor = "white",pointSize = 5)%>%dySeries(label = "Same Day")
+```
+
+### Customer Segment
+
+```{r, echo=FALSE}
+
+df<-dt%>%group_by(Segment)%>% summarise(Sales=sum(Sales),Profit=sum(Profit))%>%mutate(Segment=fct_reorder2(Segment,desc(Sales),desc(Profit)))%>% gather(key="KPI",value="money",2:3)
+
+seg_gg<-df%>%ggplot(aes(x=Segment,y=money,fill=KPI))+geom_bar(stat="identity",position = "dodge")+scale_fill_manual(values=c("darkred","palegreen"))+theme_classic()+labs(title = "The contribution of 3 Customer Segments")+xlab("Customer Segment")+ylab("The revenue and profit of each Customer Segment")+scale_y_continuous(label=comma)
+
+ggplotly(seg_gg)
+
+```
+
+### Customer_Shipping.Mode
+
+```{r, echo=FALSE}
+df<-dt%>%group_by(Ship.Mode)%>% summarise(Sales=sum(Sales),Profit=sum(Profit))%>%mutate(Ship.Mode=fct_reorder2(Ship.Mode,desc(Sales),desc(Profit)))%>% gather(key="KPI",value="money",2:3)
+
+sh_gg<-df%>%ggplot(aes(x=Ship.Mode,y=money,fill=KPI))+geom_bar(stat="identity",position = "dodge")+scale_fill_manual(values=c(brewer.pal(8,"Pastel1")))+theme_bw()+labs(title = "The contribution of Shipping Mode")+xlab("Ship.Mode Segment")+ylab("The revenue and profit of each Ship.Mode Segment")+scale_y_continuous(label=comma)+coord_flip()
+
+ggplotly(sh_gg)
+
+```
+
+### Customer in each country
+```{r, echo=FALSE}
+df<-dt%>%group_by(State)%>% summarise(Sales=sum(Sales),Profit=sum(Profit))%>%mutate(State=fct_reorder2(State,desc(Sales),desc(Profit)))%>% gather(key="KPI",value="money",2:3)
+
+ct_gg<-df%>%ggplot(aes(x=State,y=money,fill=KPI))+geom_bar(stat="identity",position = "dodge")+scale_fill_manual(values=c("darkred","cyan"))+theme_minimal()+labs(title = "The contribution of each State")+xlab("Ship.Mode Segment")+ylab("The revenue and profit of each Ship.Mode Segment")+scale_y_continuous(label=comma)+theme(axis.text.x = element_blank())+coord_flip()
+
+ggplotly(ct_gg)
+
+
+```
+
+### Customer Location
+
+```{r, echo=FALSE}
+
+df<-dt%>%group_by(State)%>% summarise(Sales=sum(Sales),Profit=sum(Profit))%>%mutate(State=fct_reorder2(State,desc(Sales),desc(Profit)))%>%ungroup()%>%mutate(State=as.character(State))
+
+m_pr<-dt%>%group_by(State)%>%summarise(Sales=sum(Sales),Profit=sum(Profit),Shipping.Cost=sum(Shipping.Cost))%>%ungroup()%>%mutate(Sales=mean(Sales),Profit=mean(Profit),Shipping.Cost=mean(Shipping.Cost))%>%head(1)
+
+
+df_map<- inner_join(df,us_state,by=c("State"="Place.Name"))%>%mutate(content=paste(sep="<br/>",State,Sales,Profit))%>%arrange(desc(Sales))%>%mutate(row=c(1:46),Class=ifelse(row<10,"A",ifelse(row>9&row<20,"B",ifelse(row>29,"D","C"))))
+
+pal<-colorFactor(c("red","darkorchid","black","cyan"),domain = c("A","B","C","D"))
+
+leaflet(df_map)%>%addTiles()%>%
+    addProviderTiles(providers$Stamen.TonerLines,
+                     options = providerTileOptions(opacity = 0.35)) %>%
+    addProviderTiles(providers$Stamen.TonerLabels)%>% addCircleMarkers(lng=~Longitude,lat = ~Latitude,label = ~State,color = ~pal(Class),radius = ~log10(Sales)*5,stroke = FALSE,fillOpacity = 0.7)%>%addPopups(lng = ~Longitude,lat=~Latitude,popup = ~content,options=popupOptions(closeOnClick = TRUE,closeButton = TRUE))
+
+```
+
+Column {data-height=250}  
+-----------------------------------------------------------------
+
+### Average of Sales <font size='4'> "Average of Sales" </font>
+
+```{r fig.height=12}
+# Average Sales of total US States
+mean<- round(m_pr$Sales, 2)
+
+# Create value box
+valueBox(mean, icon = "fa-plus", color = 'firebrick')
+```
+
+### Average of Profit <font size='4'> "Average of Profit" </font>
+
+```{r fig.height=12}
+# Average Profits of total US States
+profit<- round(m_pr$Profit, 2)
+
+# Create value box
+valueBox(profit, icon = "fa-plus", color = 'success')
+```
+
+### Average of Shipping Cost <font size='4'> "Average of Shipping Cost" </font>
+
+```{r fig.height=12}
+# Average Shipping Cost of total US States
+Shipping.Cost<- round(m_pr$Shipping.Cost, 2)
+
+# Create value box
+valueBox(Shipping.Cost, icon = "fa-plus", color = 'warning')
+```
+
+### Distribution of leadtime
+
+```{r}
+gg_hist<-dt%>%ggplot(aes(x=leadtime,y=..density..))+geom_histogram(bins=30,color="white",fill="darkred")+geom_density(color="white",fill="lightgreen",alpha=0.5)+theme_minimal()+labs(title="The leadtime distribution")+xlab("Leadtime")+ylab("Density")
+
+ggplotly(gg_hist)
+
+
+```
+
+
+
+
+
+
+
+
