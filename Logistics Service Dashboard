@@ -14,16 +14,15 @@ output:
 ---
 
 ```{r,include=FALSE}
+
 library(tidyverse)
+library(tidymodels)
 library(DT)
 library(dygraphs)
 library(scales)
 library(RColorBrewer)
 library(viridis)
-library(arules)
 library(lubridate)
-library(tidyr)
-library(purrr)
 library(gridExtra)
 library(skimr)
 library(xts)
@@ -39,18 +38,17 @@ library(collapsibleTree)
 library(wordcloud)
 library(tidytext)
 library(tidyr)
-library(wordcloud2)
 library(GGally)
-library(tidyr)
 library(radarchart)
 ```
 
 ```{r, include=FALSE}
 
-setwd("C:/Users/DellPC/Desktop/R_source_code/logistics_service_usa")
-df<-read.csv("global_superstore.csv")
+
 us_state<-read.csv("us_state.csv",header=TRUE)
-dt<-df%>%mutate(Order.Date=as.Date(Order.Date,format="%m/%d/%Y"),Ship.Date=as.Date(Ship.Date,format="%m/%d/%Y"))%>%mutate(leadtime=Ship.Date-Order.Date)%>%na.omit()
+df<- read.csv("global_superstore.csv")
+
+dt<-df%>%mutate(Order.Date=as.Date(Order.Date,format="%m/%d/%Y"),Ship.Date=as.Date(Ship.Date,format="%m/%d/%Y"))%>% mutate(leadtime=Ship.Date-Order.Date)%>%na.omit()
 
 ```
 
@@ -638,56 +636,58 @@ Column {.tabset .tabset-fade .tabset-pills}
 
 ```{r}
 
-set.seed(1234)
+set.seed(12345)
 
-wines_k8 <- kmeans(winesNorm, centers=8)
+df<- dt%>%select(c(Sales, Profit, Shipping.Cost, leadtime))
+df$leadtime<-as.numeric(df$leadtime)
+rownames(df)<-NULL
 
-# Mean values of each cluster
-table<-aggregate(df2, by=list(wines_k8$cluster), mean)
+kclust<- tibble(k=1:9)%>%mutate(kclust=map(k,~kmeans(df,.)),glanced=map(kclust,glance),tidied=map(kclust,tidy),augmented=map(kclust,augment,df))
 
-# Clustering 
-ggpairs(cbind(df2, Cluster=as.factor(wines_k8$cluster)),
-        columns=1:4, aes(colour=Cluster, alpha=0.5),
+glanced<- kclust%>%unnest(glanced)
+tidied<- kclust%>%unnest(tidied)%>%mutate(Sales=x1,Profit=x2,Shipping.Cost=x3,leadtime=x4)
+augmented<-kclust%>%unnest(augmented)
+
+
+glanced%>%ggplot(aes(x=k))+geom_line(aes(group=1,y=tot.withinss))+geom_point(aes(y=tot.withinss))+geom_line(aes(group=1,y=betweenss,color="red"))+geom_point(aes(y=betweenss,color="red"))+scale_x_continuous(breaks = c(1:9))+theme_light()
+
+p1<-augmented%>%ggplot(aes(x=Profit,y=Shipping.Cost))+geom_point(aes(color=.cluster))+facet_wrap(~k)
+
+p1+geom_point(data=tidied,aes(shape="M",size=10))
+
+
+
+
+```
+
+
+### ggpair plot
+
+```{r}
+
+
+
+ggpairs(augmented[,5:9],columns=1:4, aes(colour=.cluster, alpha=0.5),
         lower=list(continuous="points"),
         upper=list(continuous="blank"),
         axisLabels="none", switch="both") +
         theme_bw()
-```
-
-
-
+```  
 
 
 ### Summary
 
 ```{r}
 
-df<-table%>%mutate(Group=Group.1)%>%select(-Group.1)
-df[1,2]<-2692.140069
 
-Group_1<-df%>%gather(key=var,value=val,1:4)%>%filter(Group==1)%>%mutate(Group_1=log(val))%>%select(-c(Group,var,val))
+df<- tidied %>%filter(k==6)%>%select(Sales,Profit,Shipping.Cost,leadtime,k)
+df$k<- c(1:6)
 
-Group_2<-df%>%gather(key=var,value=val,1:4)%>%filter(Group==2)%>%mutate(Group_2=log(val))%>%select(-c(Group,var,val))
-
-Group_3<-df%>%gather(key=var,value=val,1:4)%>%filter(Group==3)%>%mutate(Group_3=log(val))%>%select(-c(Group,var,val))
-
-Group_4<-df%>%gather(key=var,value=val,1:4)%>%filter(Group==4)%>%mutate(Group_4=log(val))%>%select(-c(Group,var,val))
-
-Group_5<-df%>%gather(key=var,value=val,1:4)%>%filter(Group==5)%>%mutate(Group_5=log(val))%>%select(-c(Group,var,val))
-
-Group_6<-df%>%gather(key=var,value=val,1:4)%>%filter(Group==6)%>%mutate(Group_6=log(val))%>%select(-c(Group,var,val))
-
-Group_7<-df%>%gather(key=var,value=val,1:4)%>%filter(Group==7)%>%mutate(Group_7=log(val))%>%select(-c(Group,var,val))
-
-Group_8<-df%>%gather(key=var,value=val,1:4)%>%filter(Group==8)%>%mutate(Group_8=log(val))%>%select(-c(Group,var,val))
-
-label=c("Sales","Profit","leadtime","Shipping.Cost")
-
-scores<-cbind.data.frame(label,Group_1,Group_2,Group_3,Group_4,Group_5,Group_6,Group_7,Group_8)
+labs<-c("Sales","Profit","Shipping.Cost","Leadtime")
+scores<-list(k1=c(73.1, 9.56,8.17,3.97 ),k2=c(614,46.3,68.2,3.93),k3=c(3953, 1022,349,3.84),k4=c(4112,-2905, 362, 4.1),k5=c(1655,252,188,3.82),k5=c(1655,252,188.,3.82),k6=c( 12559 ,4112,277,4))
 
 
-
-chartJSRadar(scores,width=1000,height=1000,main="The brief 4 variables for each Group, Profit_Group1 is negative",showToolTipLabel = TRUE,showLegend = TRUE,maxScale = 14,responsive = TRUE,polyAlpha = 0.1)
+chartJSRadar(scores,labs = labs,width=1000,height=1000,main="The brief 4 variables for each Group, Profit_Group1 is negative",showToolTipLabel = TRUE,showLegend = TRUE,maxScale = 14,responsive = TRUE,polyAlpha = 0.1)
 
 
 ```
